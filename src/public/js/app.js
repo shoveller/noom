@@ -112,6 +112,7 @@ async function handleWelcomeSubmit(event) {
   event.preventDefault();
   const input = welcomeForm.querySelector("input");
   await initCall();
+  console.log('0. 방에 들어간다, 미디어를 시작한다')
   socket.emit("join_room", input.value);
   roomName = input.value;
   input.value = "";
