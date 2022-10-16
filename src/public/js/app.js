@@ -112,7 +112,7 @@ async function handleWelcomeSubmit(event) {
   event.preventDefault();
   const input = welcomeForm.querySelector("input");
   await initCall();
-  console.log('0. 방에 들어간다, 미디어를 시작한다')
+  console.log('2. 방에 들어간다')
   socket.emit("join_room", input.value);
   roomName = input.value;
   input.value = "";
@@ -125,10 +125,9 @@ welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 socket.on("welcome", async () => {
   myDataChannel = myPeerConnection.createDataChannel("chat");
   myDataChannel.addEventListener("message", (event) => console.log(event.data));
-  console.log("made data channel");
+  console.log('5. 누군가 접속했다. 그에게 보낼 오퍼를 서버에 보낸다.')
   const offer = await myPeerConnection.createOffer();
   myPeerConnection.setLocalDescription(offer);
-  console.log("sent the offer");
   socket.emit("offer", offer, roomName);
 });
 
@@ -139,27 +138,31 @@ socket.on("offer", async (offer) => {
       console.log(event.data)
     );
   });
-  console.log("received the offer");
+  console.log('7. 오퍼를 수신했다. 오퍼를 클라이언트에 설정한다.')
   myPeerConnection.setRemoteDescription(offer);
+
+  console.log('8. 답을 생성한다. 답을 클라이언트에 설정한다')
   const answer = await myPeerConnection.createAnswer();
   myPeerConnection.setLocalDescription(answer);
+
+  console.log('9. 답을 서버에 보낸다')
   socket.emit("answer", answer, roomName);
-  console.log("sent the answer");
 });
 
 socket.on("answer", (answer) => {
-  console.log("received the answer");
+  console.log('11. 서버에서 답을 받았다. 답을 클라이언트에 설정한다')
   myPeerConnection.setRemoteDescription(answer);
 });
 
 socket.on("ice", (ice) => {
-  console.log("received candidate");
+  console.log("14. 상대방의 web rtc 커넥션을 수산했다. 클라이언트에 설정한다");
   myPeerConnection.addIceCandidate(ice);
 });
 
 // RTC Code
 
 function makeConnection() {
+  console.log('0. web rtc 커넥션을 만든다')
   myPeerConnection = new RTCPeerConnection({
     iceServers: [
       {
@@ -173,19 +176,17 @@ function makeConnection() {
       },
     ],
   });
-  myPeerConnection.addEventListener("icecandidate", handleIce);
-  myPeerConnection.addEventListener("addstream", handleAddStream);
+  myPeerConnection.addEventListener("icecandidate", (data) => {
+    console.log('12. web rtc 커넥션을 서버로 보낸다')
+    socket.emit("ice", data.candidate, roomName);
+  });
+  myPeerConnection.addEventListener("addstream", (data) => {
+    console.log('15. 상대방으로부터 스트림을 받았다. 클라이언트 비디오에 연결한다', data.stream)
+    const peerFace = document.getElementById("peerFace");
+    peerFace.srcObject = data.stream;
+  });
+  console.log('1: 비디오 스트림과 오디오 스트림을 커넥션에 추가한다')
   myStream
     .getTracks()
     .forEach((track) => myPeerConnection.addTrack(track, myStream));
-}
-
-function handleIce(data) {
-  console.log("sent candidate");
-  socket.emit("ice", data.candidate, roomName);
-}
-
-function handleAddStream(data) {
-  const peerFace = document.getElementById("peerFace");
-  peerFace.srcObject = data.stream;
 }
